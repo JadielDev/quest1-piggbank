@@ -1,8 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QuickTransactionForm } from "./QuickTransactionForm";
 
 describe("QuickTransactionForm", () => {
+  afterEach(() => {
+    cleanup();
+  });
   it("renders all form fields and the submit button", () => {
     render(<QuickTransactionForm onAdd={vi.fn()} />);
 
@@ -21,13 +24,14 @@ describe("QuickTransactionForm", () => {
     fireEvent.change(screen.getAllByRole("combobox")[0], {
       target: { value: "income" },
     });
-    fireEvent.change(screen.getByPlaceholderText(/Ex: 2500/i), {
+    // use label queries to avoid ambiguity when multiple placeholders exist
+    fireEvent.change(screen.getByLabelText(/Valor/i), {
       target: { value: "2500" },
     });
-    fireEvent.change(screen.getByPlaceholderText(/Cliente, compra ou serviço/i), {
+    fireEvent.change(screen.getByLabelText(/Descrição/i), {
       target: { value: "Venda rápida" },
     });
-    fireEvent.change(screen.getByPlaceholderText(/Ex: Serviços/i), {
+    fireEvent.change(screen.getByLabelText(/Categoria/i), {
       target: { value: "Serviços" },
     });
     fireEvent.change(screen.getByLabelText(/Data/i), {
