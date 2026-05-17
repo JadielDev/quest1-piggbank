@@ -9,6 +9,9 @@ import {
   DATE_DISPLAY_FORMAT,
   DATE_URL_FORMAT,
   MAX_DATE_RANGE_MONTHS,
+  parseUrlDate,
+  getDateRangeFromQuery,
+  isInDateRange,
 } from "./date";
 
 const FIXED_NOW = new Date("2026-04-03T12:00:00.000Z");
@@ -97,6 +100,39 @@ describe("getDefaultDateRange", () => {
   });
 });
 
+describe("parseUrlDate", () => {
+  it("parses a yyyy-MM-dd string to a valid date", () => {
+    const parsed = parseUrlDate("2026-03-15");
+
+    expect(parsed).toBeInstanceOf(Date);
+    expect(parsed?.getFullYear()).toBe(2026);
+    expect(parsed?.getMonth()).toBe(2);
+    expect(parsed?.getDate()).toBe(15);
+  });
+
+  it("returns null for an invalid date string", () => {
+    expect(parseUrlDate("2026-02-30")).toBeNull();
+  });
+});
+
+describe("getDateRangeFromQuery", () => {
+  it("returns a normalized range for valid query params", () => {
+    const range = getDateRangeFromQuery({ from: "2026-03-01", to: "2026-03-05" });
+
+    expect(range).toBeDefined();
+    expect(range?.from.getFullYear()).toBe(2026);
+    expect(range?.from.getMonth()).toBe(2);
+    expect(range?.from.getDate()).toBe(1);
+    expect(range?.from.getHours()).toBe(0);
+    expect(range?.to.getDate()).toBe(5);
+    expect(range?.to.getHours()).toBe(23);
+  });
+
+  it("returns undefined when query params are invalid", () => {
+    expect(getDateRangeFromQuery({ from: "invalid", to: "2026-03-05" })).toBeUndefined();
+  });
+});
+
 describe("isValidDateRange", () => {
   it("returns true when to is after from", () => {
     expect(
@@ -116,9 +152,29 @@ describe("isValidDateRange", () => {
     ).toBe(false);
   });
 
-  it("returns false when from and to are the same instant", () => {
+  it("returns true when from and to are the same instant", () => {
     const date = new Date(2026, 0, 1);
-    expect(isValidDateRange({ from: date, to: date })).toBe(false);
+    expect(isValidDateRange({ from: date, to: date })).toBe(true);
+  });
+});
+
+describe("isInDateRange", () => {
+  it("returns true for dates inside the interval", () => {
+    const range = {
+      from: new Date(2026, 2, 1),
+      to: new Date(2026, 2, 10),
+    };
+
+    expect(isInDateRange(new Date(2026, 2, 5), range)).toBe(true);
+  });
+
+  it("returns false for dates outside the interval", () => {
+    const range = {
+      from: new Date(2026, 2, 1),
+      to: new Date(2026, 2, 10),
+    };
+
+    expect(isInDateRange(new Date(2026, 2, 11), range)).toBe(false);
   });
 });
 

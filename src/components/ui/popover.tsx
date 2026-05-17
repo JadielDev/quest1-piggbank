@@ -1,16 +1,32 @@
 "use client"
 
 import * as React from "react"
+import type { VariantProps } from "class-variance-authority"
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
 
+import { buttonVariants } from "./button"
 import { cn } from "@/lib/utils"
 
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />
 }
 
-function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
+function PopoverTrigger({
+  className,
+  variant,
+  size,
+  ...props
+}: PopoverPrimitive.Trigger.Props & {
+  variant?: VariantProps<typeof buttonVariants>["variant"]
+  size?: VariantProps<typeof buttonVariants>["size"]
+}) {
+  return (
+    <PopoverPrimitive.Trigger
+      data-slot="popover-trigger"
+      className={cn(buttonVariants({ variant: variant ?? "outline", size: size ?? "default", className }))}
+      {...props}
+    />
+  )
 }
 
 function PopoverContent({

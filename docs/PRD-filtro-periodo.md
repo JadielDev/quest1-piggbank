@@ -71,116 +71,127 @@ Adicionar um **filtro interativo de período** (data início + data fim) que per
 
 ---
 
-## 3. Impactos da Feature
+## 3. Perguntas de Borda Prioritárias
 
-A feature afeta **4 pilares principais**:
+### Perguntas que ainda precisam definição
 
-1. **Dados (`src/lib/api.ts`)** — filtrar `getTransactions()`, recalcular `getMetrics()`
-2. **Validação (`src/lib/date.ts`)** — regras de intervalo invertido, limite máximo
-3. **Componentes de UI** — novo `DateRangeFilter`, estender `TransactionsTable` e dashboard header
-4. **Estado/Navegação** — persistência via URL params, debounce 300-500ms
+- O filtro deve rejeitar ou inverter automaticamente quando `startDate > endDate`?
+- Um intervalo com `startDate == endDate` deve ser aceito como um dia completo ou rejeitado?
+- Datas futuras são permitidas? Se não, como o picker deve bloquear ou alertar?
+- `startDate` preenchido e `endDate` vazio: o que o dashboard deve exibir?
+- O filtro deve aplicar imediatamente (com debounce) ou exigir confirmação com botão "Aplicar"?
+- O reset deve voltar aos últimos 30 dias ou apenas limpar os campos?
+- Se o usuário altera a URL diretamente, o componente deve re-sincronizar imediatamente?
+- Como comunicar claramente um período sem transações para evitar que usuário pense em erro?
+- O formato aceito no input deve ser apenas `dd/MM/yyyy` ou devemos aceitar múltiplos formatos?
+- Em período que cruza DST, como garantir que transações de borda de dia não sejam excluídas?
+- A persistência deve ser exclusivamente via URL ou usar fallback em localStorage/sessionStorage?
+- Em mobile, o controle de período deve usar input nativo ou um popover customizado?
 
----
+### Contexto
 
-## 4. Perguntas de Borda (104 Edge Cases)
-
-**Ver documento completo: [EDGE-CASES-filtro-periodo.md](EDGE-CASES-filtro-periodo.md)**
-
-12 categorias:
-- Comportamento do filtro (11 perguntas)
-- Validação de datas (13 perguntas)
-- Experiência do usuário (10 perguntas)
-- Timezone (7 perguntas)
-- Persistência (8 perguntas)
-- Performance (7 perguntas)
-- Comportamento sem dados (6 perguntas)
-- Integração frontend/backend (6 perguntas)
-- Mobile (7 perguntas)
-- Acessibilidade (8 perguntas)
-- Inconsistências de métricas (8 perguntas)
-- Casos extremos (5 perguntas)
-
-**⚠️ Crítico:** As 10 perguntas de maior prioridade devem ser respondidas antes do Spec Doc.
+- Foram identificadas **104 perguntas de borda** no documento de edge cases.
+- As principais categorias são: comportamento do filtro, validação de datas, UX, timezone, persistência, performance, sem dados, integração, mobile e acessibilidade.
+- O documento completo está em **[docs/EDGE-CASES-filtro-periodo.md](EDGE-CASES-filtro-periodo.md)**.
 
 ---
 
-## 5. Riscos Identificados (23 Riscos)
+## 4. Riscos Identificados
 
-**Ver documento completo: [RISCOS-filtro-periodo.md](RISCOS-filtro-periodo.md)**
+### Riscos Técnicos
 
-**10 Riscos Técnicos:** Inconsistência de dados, intervalo invertido, timezone, performance, datas inválidas, sync URL, race conditions, transações inválidas, mobile, erro de API
+- **R-TEC-001:** inconsistência entre métricas e tabela se o mesmo filtro não for aplicado em todas as camadas.
+- **R-TEC-002:** intervalo invertido sem validação clara pode retornar 0 transações e confundir o usuário.
+- **R-TEC-003:** timezone e bordas de dia podem excluir transações que pertencem ao período local.
+- **R-TEC-004:** performance degradada em intervalos longos sem limite máximo definido.
+- **R-TEC-005:** dados inválidos ou input malformado podem causar crashes no cálculo de métricas.
 
-**5 Riscos de Negócio:** Período errado, falta de presets, sem dados confunde, feature não resolve problema, falta de comunicação
+### Riscos de Negócio
 
-**8 Riscos Operacionais:** Sem definição clara, testes insuficientes, sem feature flag, sem monitoramento, documentação fraca, design/dev desalinhados, dependências bloqueadas, sem acceptance criteria
+- usuário não entende qual período está aplicado ou percebe o filtro como instável
+- estado sem dados é interpretado como erro, não como ausência real de transações
+- filtro não persistido via URL impede combinação e compartilhamento de análises
+- ausência de presets faz a feature parecer incompleta para análise rápida
+- comportamento de reset sem padrão claro reduz confiança do usuário
 
-**Top 5 Riscos Críticos a Mitigar:**
-1. R-TEC-001 (Inconsistência filtro/dados)
-2. R-TEC-004 (Performance degrada)
-3. R-NEG-001 (Usuário confuso)
-4. R-OPS-002 (Testes insuficientes)
-5. R-OPS-003 (Sem feature flag)
+### Riscos Operacionais
 
----
+- falta de testes em edge cases críticos do filtro de período
+- ausência de feature flag para rollout gradual
+- desalinhamento entre design e implementação do fluxo de validação
+- documentação insuficiente do contrato de query params e formato de data
+- falta de responsáveis definidos para decisões de regra
 
-## 6. Constraints que Precisam Definição (26)
+### Top 5 riscos críticos a mitigar
 
-**Ver documento completo: [CONSTRAINTS-filtro-periodo.md](CONSTRAINTS-filtro-periodo.md)**
+1. inconsistência de filtro entre métricas e tabela
+2. performance em intervalos longos
+3. confusão do usuário com período aplicado
+4. validação de datas malformadas
+5. ausência de feature flag
 
-4 categorias principais a decidir ANTES do Spec Doc:
-
-- **Comportamento (4):** intervalo invertido, data igual, aplicação do filtro, limpeza
-- **Validação (4):** datas futuras, datas antigas, limite máximo, formato
-- **Timezone (2):** timezone storage/display, bordas de dia
-- **[+ 16 mais em: Persistência, Performance, UX, Acessibilidade, Compatibilidade, Integração, Segurança]**
-
-Cada constraint tem 2-4 opções com trade-offs documentados.
-
----
-
-## 7. Recomendações de Próximos Passos
-
-### Imediato (Esta Semana)
-
-1. **[CRÍTICO] Validar com usuários** — Entrevistar 5-10 PMEs | PM | 3 dias
-2. **[CRÍTICO] Definir 26 constraints** — Reunião decisão PM+Designer+Dev | Tech Lead | 2 dias
-3. **[CRÍTICO] Mapear dependências** — Quando `src/lib/api.ts` estará pronto? | Dev Lead | 1 dia
-
-### Fases
-
-| Fase | Deliverable | Duração | Owner |
-|------|-------------|---------|-------|
-| **Spec Doc** | Documento técnico detalhado | 1 semana | Dev + Designer |
-| **Design** | Mockups + prototipo interativo | 1.5 semanas | Designer |
-| **Implementação** | MVP com feature flag | 3-4 semanas | Dev + QA |
-| **Testing** | Testes E2E + staging | 1 semana | QA |
-| **Launch** | Rollout gradual + monitoramento | 1 semana | DevOps + Dev |
-
-**Total: ~8-9 semanas do kickoff ao launch.**
+O documento completo de riscos está em **[docs/RISCOS-filtro-periodo.md](RISCOS-filtro-periodo.md)**.
 
 ---
 
-## 8. Artefatos da Discovery
+## 5. Constraints que Precisam Definição Antes do Spec Doc
 
-| Artefato | Status | Responsabilidade |
-|----------|--------|------------------|
-| [PRD-filtro-periodo.md](PRD-filtro-periodo.md) | ✅ Completo | Resumo executivo (este doc) |
-| [EDGE-CASES-filtro-periodo.md](EDGE-CASES-filtro-periodo.md) | ✅ Completo | 104 perguntas de borda |
-| [RISCOS-filtro-periodo.md](RISCOS-filtro-periodo.md) | ✅ Completo | 23 riscos + mitigações |
-| [CONSTRAINTS-filtro-periodo.md](CONSTRAINTS-filtro-periodo.md) | ✅ Completo | 26 constraints — Aguardando decisões |
+### Decisões-chave necessárias
+
+- tratar intervalo invertido: erro ou inversão automática?
+- aceitar intervalo de um dia (`startDate == endDate`)?
+- aplicar o filtro imediatamente com debounce ou via botão de confirmação?
+- reset deve retornar aos últimos 30 dias ou limpar campos?
+- permitir datas futuras ou bloquear até hoje?
+- definir limite máximo do intervalo (por exemplo, 12 meses)?
+- aceitar apenas formato PT-BR ou suportar múltiplos formatos?
+- URL como fonte de verdade ou fallback com localStorage?
+- usar UTC internamente e exibir localmente para timezone?
+- no mobile, usar input nativo ou popover customizado para data?
+
+### Categorias de constraints
+
+- comportamento do filtro
+- validação de datas
+- timezone e bordas de dia
+- persistência e navegação
+- performance e limites de intervalo
+- experiência sem dados
+- mobile e acessibilidade
+- integração frontend/backend
+
+O documento completo de constraints está em **[docs/CONSTRAINTS-filtro-periodo.md](CONSTRAINTS-filtro-periodo.md)**.
 
 ---
 
-## 9. Checklist de Saída da Discovery
+## 6. Recomendações de Próximos Passos
 
-- [ ] Todo time leu os 4 artefatos
-- [ ] Constraints preenchidos com decisões (100% com ✓)
-- [ ] Mitigações de Top 5 riscos documentadas
-- [ ] Reunião de kickoff agendada e executada
-- [ ] Owners de cada constraint identificados
-- [ ] Decisões comunicadas para todo time
-- [ ] Prazo para início do Spec Doc definido
+1. definir as 10 constraints críticas com PM, Designer e Dev
+2. confirmar regras de validação e formato de data
+3. validar persistência via query params
+4. criar o Spec Doc técnico com base nessas decisões
+5. planejar implementação com feature flag e testes automáticos
 
 ---
 
-> 🚀 **Discovery completa.** Próximo milestone: **Spec Doc técnico detalhado.**
+## 7. Artefatos da Discovery
+
+- `docs/PRD-filtro-periodo.md` — este documento
+- `docs/EDGE-CASES-filtro-periodo.md` — 104 perguntas de borda
+- `docs/RISCOS-filtro-periodo.md` — 23 riscos com mitigação
+- `docs/CONSTRAINTS-filtro-periodo.md` — 26 constraints a definir
+
+---
+
+## 8. Checklist da Discovery
+
+- [ ] todo time leu os 4 artefatos
+- [ ] constraints definidas antes do spec
+- [ ] mitigações dos top 5 riscos documentadas
+- [ ] reunião de kickoff agendada
+- [ ] owners identificados
+- [ ] prazo para Spec Doc definido
+
+---
+
+> 🚀 Discovery consolidada. Próximo milestone: Spec Doc técnico detalhado.
