@@ -5,6 +5,7 @@ import { computeMetrics } from "@/lib/metrics";
 import type { Transaction } from "@/types";
 import { MetricsCard } from "./MetricsCard";
 import { NewTransactionModal } from "./NewTransactionModal";
+import { ExportButton } from "./ExportButton";
 import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "./TransactionsTable";
 
@@ -47,12 +48,15 @@ export function DashboardClient({ initialTransactions }: DashboardClientProps) {
 
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-foreground">Registrar nova transação</p>
+          <p className="text-sm font-medium text-foreground">Gerenciamento de Transações</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Abra o modal para adicionar uma receita ou despesa rapidamente.
+            Adicione novas transações ou exporte seus dados para análise externa.
           </p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>Nova transação</Button>
+        <div className="flex items-center gap-3">
+          <ExportButton transactions={transactions} />
+          <Button onClick={() => setIsModalOpen(true)}>Nova transação</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
