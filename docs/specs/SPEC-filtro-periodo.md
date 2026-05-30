@@ -1,34 +1,35 @@
-# Spec Doc: Filtro de Período no Dashboard
+﻿# Spec Doc: Filtro de período no dashboard
 
 ## Overview
 
-**Feature:** adicionar um filtro global de período no dashboard que permite ao usuário escolher data de início e data fim para filtrar todas as métricas e transações.
+**Feature:** adicionar um filtro de período no dashboard do piggbank para permitir que o usuário selecione um intervalo de datas e visualize métricas e transações apenas para esse período.
 **Status:** Draft
 **Owner:** [dev responsável]
-**Created:** 2026-05-09
-**Updated:** 2026-05-09
+**Created:** 2026-05-16
+**Updated:** 2026-05-16
 
 **Link PRD:** ../PRD-filtro-periodo.md
-**Link Figma:** [a definir]
+**Link Figma:** [link do design]
 
 ## Goals
 
-- [ ] Permitir seleção de intervalo customizado com `startDate` e `endDate` no dashboard.
-- [ ] Filtrar métricas e lista de transações pelo mesmo intervalo aplicado.
-- [ ] Manter comportamento previsível para intervalos inválidos, intervalos sem dados e validação de datas futuras.
-- [ ] Garantir persistência do filtro via URL e experiência responsiva em desktop e mobile.
+- [ ] Permitir seleção de intervalo customizado (`from` / `to`) no dashboard.
+- [ ] Filtrar todas as métricas e a tabela de transações pelo mesmo período.
+- [ ] Reutilizar utilitários de data e componentes UI existentes.
+- [ ] Garantir comportamento previsível para intervalos inválidos, sem dados ou datas futuras.
 
 ## Scope & Non-Scope
 
 **In Scope:**
 
 - Componente de seleção de período no dashboard.
-- Atualizar `src/lib/api.ts` para filtrar `mockTransactions` por `DashboardFilters`.
-- Reutilizar e estender `src/lib/date.ts` para validação e formatação de datas.
-- Exibir o período aplicado no header do dashboard.
+- Atualizar `src/lib/api.ts` para filtrar `mockTransactions` usando `DashboardFilters`.
+- Reutilizar `src/lib/date.ts` para validação, formatação e parse de datas.
+- Exibir o período aplicado no cabeçalho.
 - Empty state para período sem transações.
-- Persistência do filtro via URL query params (`from` / `to`).
-- Suporte responsivo e acessível com teclado e leitor de tela.
+- Persistência do filtro via query params `from` / `to`.
+- Usar componentes UI existentes em `src/components/ui/`.
+- Garantir a página principal do dashboard como Server Component e o filtro como client component.
 
 **Out of Scope:**
 
@@ -37,41 +38,41 @@
 - Presets automáticos como "Últimos 7 dias".
 - Comparações de período (YoY, MoM).
 - Sincronização de filtro entre dispositivos.
-- Integração com backend real no MVP.
+- Backend real ou mudanças em schema de dados.
 
 ## Architecture Decisions
 
 ### 1. Query params como fonte de verdade
 
-**Decision:** usar `?from=yyyy-MM-dd&to=yyyy-MM-dd` como fonte de verdade do filtro.
+**Decision:** usar `?from=yyyy-MM-dd&to=yyyy-MM-dd` para persistir o período selecionado.
 
 **Alternatives considered:**
 
 1. Estado local no componente — não persiste e não é compartilhável.
-2. `localStorage`/`sessionStorage` — perde visibilidade e navegação.
+2. `localStorage`/`sessionStorage` — perde visibilidade em navegações e compartilhamento.
 3. ✅ Query params — mantém sincronização com refresh, compartilhamento e back/forward.
 
 **Rationale:**
 
-- `src/app/dashboard/page.tsx` já é um Server Component e pode derivar o filtro de `searchParams`.
-- Permite que `DateRangeFilter` seja client component para interatividade, mas o valor oficial permaneça na URL.
-- Simplifica links compartilháveis e navegação do usuário.
+- `src/app/dashboard/page.tsx` já recebe `searchParams` e deriva o intervalo do servidor.
+- Facilita o comportamento esperado para F5/back/forward.
+- Ajuda na integração com testes e com deep links.
 
-### 2. Server component + client interaction
+### 2. Server Component + client interaction
 
 **Decision:** manter `src/app/dashboard/page.tsx` como Server Component e criar `DateRangeFilter` como client component.
 
 **Alternatives considered:**
 
-1. Tornar a página inteira client — desperdiça o padrão de Server Components do projeto.
-2. Fazer a seleção em um modal server-rendered — não funciona bem para `react-day-picker` interativo.
-3. ✅ Client component isolado — mantém o maior escopo em servidor e adiciona apenas a UI necessária.
+1. Tornar a página inteira client — foge ao padrão do projeto e traz mais bundle.
+2. Usar só inputs de texto no servidor — perde interatividade e validação imediata.
+3. ✅ Client component isolado — mantém a maior parte do dashboard no servidor e traz apenas a UI necessária.
 
 **Rationale:**
 
-- Projetos Next.js com App Router favorecem Server Components por padrão.
-- O filtro precisa de interatividade (`Popover`, `Calendar`, validação em tempo real).
-- O componente cliente recebe `initialRange` do servidor e atualiza o URL usando `router.replace`.
+- `DateRangeFilter` precisa de `useSearchParams`, `useRouter` e interatividade do `Calendar`.
+- A página já recupera os dados via `getTransactions(filters)` no servidor.
+- O filtro atualiza apenas a query string, mantendo o fluxo de renderização do Next.js.
 
 ### 3. Filtrar dados em `src/lib/api.ts`
 
@@ -79,55 +80,35 @@
 
 **Alternatives considered:**
 
-1. Filtrar somente na tabela — resulta em cards inconsistentes.
-2. Calcular métricas no componente — desloca lógica de dados para a UI.
-3. ✅ Filtrar no `api.ts` — mantém a camada de dados centralizada.
+1. Filtrar apenas na tabela — causa inconsistência entre cards e lista.
+2. Calcular métricas direto no componente — dispersa lógica de domínio para UI.
+3. ✅ Filtrar no `api.ts` — centraliza o contrato de dados e evita divergência.
 
 **Rationale:**
 
-- `getTransactions()` atualmente ignora filtros; corrigir isso resolve a inconsistência mais importante.
-- `getMetrics()` já depende de `getTransactions(filters)` e herda o subconjunto correto.
-- Torna os testes mais diretos e a camada de dados mais previsível.
+- `getTransactions()` já é o ponto único para leitura de mock data.
+- `getMetrics()` usa `getTransactions(filters)` para derivar métricas.
+- Facilita testes unitários e garante consistência entre dados e UI.
 
-### 4. Data utilities centralizadas em `src/lib/date.ts`
+### 4. Reutilizar `src/lib/date.ts`
 
-**Decision:** manter todas as regras de período em `src/lib/date.ts` e expor validação, normalização e formatação.
+**Decision:** manter regra de datas e validação em `src/lib/date.ts`.
 
 **Alternatives considered:**
 
-1. Usar helpers espalhados no dashboard — quebra o padrão de utilitários centralizados.
-2. Reutilizar apenas `formatDisplayDate` — ainda deixa lógica de intervalos dispersa.
-3. ✅ Centralizar em `src/lib/date.ts` — usa as funções já existentes e mantém o domínio de datas único.
+1. Helpers espalhados no dashboard — aumenta risco de inconsistência.
+2. Usar apenas `formatDisplayDate` — deixa lógica de intervalo dispersa.
+3. ✅ Centralizar em `src/lib/date.ts` — mantém domínio de datas único.
 
 **Rationale:**
 
-- `src/lib/date.ts` já exporta `DATE_DISPLAY_FORMAT`, `DATE_URL_FORMAT`, `getDefaultDateRange`, `isValidDateRange`, `exceedsMaxRange`, `isDateInFuture`.
-- O filtro precisa de parse de query params e de uma função `isInDateRange()` para filtrar transações.
-- Alinha com o padrão do projeto: manipulação de datas via `date-fns` e utilitários centralizados.
+- `src/lib/date.ts` já fornece parse, validação e formatação de datas.
+- O filtro precisa das mesmas regras de `isValidDateRange`, `exceedsMaxRange` e `isDateInFuture`.
+- Segue o padrão do projeto: datas via `date-fns` e utilitário central.
 
-### 5. Reutilização de UI existente
-
-**Decision:** construir o filtro em cima de `src/components/ui/calendar.tsx`, `button.tsx` e `popover.tsx`.
-
-**Alternatives considered:**
-
-1. Implementar novo date picker do zero — aumenta tempo e risco.
-2. Usar um campo de texto simples — pior experiência e mais validação manual.
-3. ✅ Reutilizar o calendário existente — mantém consistência visual e reduz o escopo.
-
-**Rationale:**
-
-- O calendar component já existe e é compatível com `react-day-picker`.
-- A interface do app usa shadcn/ui e componentes base já prontos.
-- Reduz a necessidade de criar novos padrões de design.
-
-## API Contract
+### API Contract
 
 ```
-Internal contract:
-- getTransactions(filters: DashboardFilters): Promise<Transaction[]>
-- getMetrics(filters: DashboardFilters): Promise<MetricSummary[]>
-
 Frontend route:
 GET /dashboard?from=yyyy-MM-dd&to=yyyy-MM-dd
 
@@ -135,34 +116,21 @@ Query params:
 - from: string — data no formato yyyy-MM-dd
 - to: string — data no formato yyyy-MM-dd
 
-Response (200):
-{
-  "metrics": [
-    { "label": "Faturamento", "value": 0, "currency": true },
-    { "label": "Despesas", "value": 0, "currency": true },
-    { "label": "Lucro Líquido", "value": 0, "currency": true },
-    { "label": "Transações", "value": 0, "currency": false }
-  ],
-  "transactions": [
-    { "id": "", "description": "", "amount": 0, "type": "income", "date": "2026-05-01T00:00:00.000Z", "category": "" }
-  ],
-  "appliedFilter": {
-    "from": "2026-05-01",
-    "to": "2026-05-31"
-  }
-}
+Internal contract:
+- getTransactions(filters: DashboardFilters): Promise<Transaction[]>
+- getMetrics(filters: DashboardFilters): Promise<MetricSummary[]>
 
 Errors:
-- 400: intervalo inválido, formato incorreto ou datas futuras
+- 400: intervalo inválido ou formato incorreto
 - 422: intervalo maior que 12 meses
 - 500: erro interno
 ```
 
-## Database Schema
+### Database Schema
 
 ```sql
--- Não aplicável no momento: os dados são mockados em src/data/mock.ts.
--- Em backend real, filtrar por campo date indexado e usar parâmetros `from` / `to`.
+-- Não aplicável no momento: dados são mockados em src/data/mock.ts.
+-- Em backend real, aplicar filtro por campo date indexado e usar parâmetros `from` / `to`.
 ```
 
 ## UI/UX
@@ -173,8 +141,8 @@ Errors:
 
 **Componentes novos:**
 
-- `DateRangeFilter` — client component para seleção de intervalo e validação.
-- `DateRangeBadge` — exibe o período atual no cabeçalho (pode ser integrado ao `DateRangeFilter`).
+- `DateRangeFilter` — client component para seleção de período e validação.
+- `DateRangeBadge` — exibe o período atual no cabeçalho.
 
 **Componentes reutilizados:**
 
@@ -186,78 +154,74 @@ Errors:
 
 **Client/Server boundary:**
 
-- `src/app/dashboard/page.tsx` permanece Server Component.
+- `src/app/dashboard/page.tsx` permanece como Server Component.
 - `DateRangeFilter` é o único novo client component.
-- O filtro deve atualizar a URL usando `router.replace` com `searchParams` e disparar recarga do page.
+- O filtro atualiza a URL com `router.replace` e os dados são recarregados pelo servidor.
 
 **Estados:**
 
-- Loading: skeleton ou loading indicator durante atualização de filtro.
-- Empty: mensagem atual de `TransactionsTable` quando não há transações.
-- Error: validação inline para intervalo inválido, datas futuras ou intervalo > 12 meses.
-- Success: cards e tabela atualizados com dados filtrados.
+- Loading: indicar que o dashboard está atualizando o período.
+- Empty: exibir mensagem de "Nenhuma transação encontrada para o período selecionado.".
+- Error: validação inline para intervalo inválido, datas futuras ou período maior que 12 meses.
+- Success: exibir cards e tabela filtrados.
 
 ## Test Strategy
 
 **Unitários:**
 
-- [ ] `src/lib/date.ts` — validar parse de query params, intervalos válidos, invalid range, datas futuras, intervalo de 12 meses e `startDate == endDate`.
-- [ ] `src/lib/api.ts` — garantir que `mockTransactions` é filtrado por `dateRange`.
-- [ ] `src/lib/metrics.ts` — calcular métricas a partir de transações filtradas e retornar zeros quando vazio.
-- [ ] `src/components/dashboard/DateRangeFilter.tsx` — exibir datas iniciais, validar o range e atualizar a URL.
+- [ ] `src/lib/date.ts` — parse de query params, `isValidDateRange`, `exceedsMaxRange` e `isDateInFuture`.
+- [ ] `src/lib/api.ts` — `getTransactions` e `getMetrics` com filtro de `dateRange`.
+- [ ] `src/lib/metrics.ts` — cálculo de faturamento, despesas, lucro e contador de transações.
+- [ ] `src/components/dashboard/DateRangeFilter.tsx` — renderização do intervalo e validação de UI.
 
 **Integração:**
 
-- [ ] `src/app/dashboard/page.tsx` carrega dados com o mesmo `dateRange` para cards e tabela.
-- [ ] Filtro via URL persiste após reload.
-- [ ] Empty state aparece em períodos sem transações.
-- [ ] Invalid query params não quebram a página; fallback para `getDefaultDateRange()`.
+- [ ] `src/app/dashboard/page.tsx` carrega dados com `dateRange` derivado de `searchParams`.
+- [ ] `DateRangeFilter` atualiza a URL e o dashboard reflete o novo período.
+- [ ] empty state aparece em períodos sem transações.
+- [ ] query params inválidos não quebram a página.
 
 **E2E:**
 
-- [ ] Usuário escolhe intervalo válido e vê métricas + transações atualizadas.
-- [ ] Filtro persiste após refresh da página.
-- [ ] Seleção inválida mostra erro e não altera dados.
-- [ ] Período de um dia (`startDate == endDate`) funciona como intervalo inclusivo.
+- [ ] usuário aplica filtro válido e vê cards + tabela atualizados.
+- [ ] filtro via URL é persistido após reload.
+- [ ] erro de intervalo inválido é mostrado e impede atualização.
 
 **Edge cases:**
 
-- [ ] `startDate > endDate`
-- [ ] `startDate == endDate`
-- [ ] intervalo maior que 12 meses
-- [ ] datas futuras não permitidas
-- [ ] período sem transações
-- [ ] URL mal formada ou com parâmetros ausentes
+- [ ] intervalo invertido exibe mensagem de erro.
+- [ ] `startDate == endDate` é aceito como um único dia.
+- [ ] intervalo maior que 12 meses é bloqueado.
+- [ ] datas futuras não são aceitas.
 
 ## Delivery Checklist
 
 **Código:**
 
-- [ ] `src/app/dashboard/page.tsx` — resolve query params, aplica fallback para `getDefaultDateRange()`, e carrega `getMetrics` e `getTransactions` com o mesmo `DashboardFilters`.
-- [ ] `src/lib/api.ts` — filtra `mockTransactions` por `dateRange` e passa transações corretas para `computeMetrics()`.
-- [ ] `src/lib/date.ts` — expõe validação e formatação de data, incluindo parse de URL e `isInDateRange()`.
-- [ ] `src/components/dashboard/DateRangeFilter.tsx` — UI baseada em `Calendar`, `Popover` e `Button`, com validação inline.
-- [ ] `src/components/dashboard/TransactionsTable.tsx` — usa empty state existente e não precisa de mudanças estruturais significativas.
-- [ ] `src/components/dashboard/MetricsCard.tsx` — exibe valores zerados corretamente quando não há transações.
+- [ ] `src/lib/date.ts` — implementar parse/format/validação.
+- [ ] `src/lib/api.ts` — filtrar `mockTransactions` por `filters.dateRange`.
+- [ ] `src/components/dashboard/DateRangeFilter.tsx` — seleção, validação e atualização de query params.
+- [ ] `src/app/dashboard/page.tsx` — derivar `dateRange` e passar para `DashboardClient`.
+- [ ] `src/components/dashboard/DashboardClient.tsx` — renderizar métricas e tabela com `initialTransactions`.
 
 **Validações (sensors):**
 
 - [ ] Linter passa sem erros.
 - [ ] Build/compilação sem erros.
+- [ ] Scan de segurança/LGPD sem achados críticos.
 - [ ] Testes existentes continuam passando.
-- [ ] Testes novos verdes.
 
 **Testes novos (escritos pelo QA):**
 
-- [ ] Intervalo válido exibe métricas e transações corretas.
-- [ ] Intervalo inválido mostra erro sem aplicar filtro.
-- [ ] Intervalo sem transações mostra empty state.
+- [ ] filtro de período atualiza métricas e tabela.
+- [ ] intervalo inválido mostra mensagem de erro.
+- [ ] estado sem dados é exibido corretamente.
 
 ## Rollout Plan
 
 - [ ] Feature flag criada e desabilitada.
-- [ ] Deploy em staging e validação manual do filtro.
-- [ ] Rollout gradual em produção.
+- [ ] Deploy em staging + teste manual.
+- [ ] Rollout gradual: 5% → 25% → 50% → 100%.
 - [ ] Monitoramento ativo durante rollout.
 - [ ] Critério de rollback definido.
 
@@ -265,22 +229,18 @@ Errors:
 
 | Risco | Probabilidade | Impacto | Mitigação |
 |-------|---------------|---------|-----------|
-| Inconsistência entre métricas e tabela | Média | Alto | usar o mesmo `dateRange` para `getMetrics` e `getTransactions` |
-| Filtro inválido ou intervalo invertido | Média | Médio | validar no domínio e não aplicar antes de corrigir |
-| Performance em intervalos longos | Média | Alto | limitar a 12 meses e aplicar debounce no UI |
-| Datas futuras sem tratamento | Baixa | Médio | bloquear datas futuras no picker e exibir mensagem |
-| URL mal formada | Baixa | Médio | fallback para `getDefaultDateRange()` e manter a página íntegra |
+| inconsistência entre métricas e tabela | Alta | Alto | usar o mesmo `DashboardFilters` em `getTransactions` e `getMetrics` |
+| intervalo invertido | Média | Médio | validar `isValidDateRange` e mostrar erro inline |
+| timezone e bordas de dia | Média | Médio | usar UTC internamente e `startOfDay` / `endOfDay` |
+| performance com intervalo longo | Média | Alto | limitar intervalo a 12 meses e mostrar mensagem clara |
+| input de data malformado | Baixa | Médio | usar validação rigorosa em `parseUrlDate` |
 
 ## Dependencies
 
-- `src/lib/date.ts` — regras de data, validação e formatos.
-- `src/lib/api.ts` — fonte única de dados filtrados.
-- `src/lib/metrics.ts` — cálculo de métricas a partir de transações.
-- `src/components/ui/calendar.tsx` — date picker reutilizado.
-- `src/components/ui/button.tsx` — botões padrão do design system.
-- `src/components/ui/popover.tsx` — container de calendário.
-- `src/data/mock.ts` — fonte de dados atual.
-- `src/types/index.ts` — `DateRange`, `DashboardFilters`, `Transaction`, `MetricSummary`.
+- [ ] design do filtro de período e estados de erro finalizados.
+- [ ] validação das regras de intervalo com PM/Designer.
+- [ ] `src/components/ui/calendar.tsx`, `button.tsx`, `popover.tsx` disponíveis.
+- [ ] `src/lib/api.ts` e `src/lib/date.ts` prontos para reutilização.
 
 ## Checklist de aprovação
 
@@ -291,4 +251,3 @@ Errors:
 - [ ] Test strategy cobre caminho feliz + edge cases.
 - [ ] Rollout plan com feature flag.
 - [ ] Riscos identificados com mitigação.
-''', encoding='utf-8')"

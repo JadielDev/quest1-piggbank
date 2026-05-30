@@ -1,11 +1,13 @@
 import {
   format,
+  parse,
   subDays,
   isAfter,
   isBefore,
   differenceInMonths,
   startOfDay,
   endOfDay,
+  isValid as isValidDate,
 } from "date-fns";
 import type { DateRange } from "@/types";
 
@@ -29,7 +31,33 @@ export function getDefaultDateRange(): DateRange {
 }
 
 export function isValidDateRange(range: DateRange): boolean {
-  return isAfter(range.to, range.from);
+  return !isAfter(range.from, range.to);
+}
+
+export function parseUrlDate(value: string): Date | null {
+  const parsed = parse(value, DATE_URL_FORMAT, new Date());
+  return isValidDate(parsed) ? parsed : null;
+}
+
+export function getDateRangeFromQuery(params: {
+  from?: string;
+  to?: string;
+}): DateRange | undefined {
+  const from = params.from ? parseUrlDate(params.from) : null;
+  const to = params.to ? parseUrlDate(params.to) : null;
+
+  if (!from || !to) {
+    return undefined;
+  }
+
+  return {
+    from: startOfDay(from),
+    to: endOfDay(to),
+  };
+}
+
+export function isInDateRange(date: Date, range: DateRange): boolean {
+  return !isBefore(date, range.from) && !isAfter(date, range.to);
 }
 
 export function exceedsMaxRange(range: DateRange): boolean {
