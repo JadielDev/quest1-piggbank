@@ -1,14 +1,36 @@
-import { MetricsCard } from "@/components/dashboard/MetricsCard";
-import { TransactionsTable } from "@/components/dashboard/TransactionsTable";
-import { getMetrics, getTransactions } from "@/lib/api";
-import { getDefaultDateRange } from "@/lib/date";
+import { Suspense } from "react"
+import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
+import { DashboardClient } from "@/components/dashboard/DashboardClient";
+import { getTransactions } from "@/lib/api";
+import { getDateRangeFromQuery, getDefaultDateRange } from "@/lib/date";
+import type { DateRange } from "@/types";
 
-export default async function DashboardPage() {
-  const filters = { dateRange: getDefaultDateRange() };
-  const [metrics, transactions] = await Promise.all([
-    getMetrics(filters),
-    getTransactions(filters),
-  ]);
+type SearchParams = Record<string, string | string[] | undefined>;
+
+type DashboardPageProps = {
+  searchParams?: SearchParams;
+};
+
+function normalizeQueryParam(value?: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: DashboardPageProps) {
+  const dateRange: DateRange =
+    getDateRangeFromQuery({
+      from: normalizeQueryParam(searchParams?.from),
+      to: normalizeQueryParam(searchParams?.to),
+    }) ?? getDefaultDateRange();
+
+  const filters = { dateRange };
+  const transactions = await getTransactions(filters);
+
   return (
     <div className="min-h-screen bg-background">
       <nav className="border-b border-border">
@@ -32,24 +54,12 @@ export default async function DashboardPage() {
               Métricas financeiras do período
             </p>
           </div>
-          {/* TODO: substituir pelo DateRangeFilter — piggbank-142 */}
-          <div className="rounded-md border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
-            Últimos 30 dias
-          </div>
+          <Suspense fallback={<div className="h-9 w-40" />}>
+            <DateRangeFilter initialRange={dateRange} />
+          </Suspense>
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
-          {metrics.map((metric) => (
-            <MetricsCard key={metric.label} metric={metric} />
-          ))}
-        </div>
-
-        <div>
-          <h2 className="mb-4 text-base font-medium text-foreground">
-            Transações recentes
-          </h2>
-          <TransactionsTable transactions={transactions} />
-        </div>
+        <DashboardClient initialTransactions={transactions} />
       </main>
     </div>
   );
